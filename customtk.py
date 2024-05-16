@@ -110,8 +110,13 @@ def add_task(name, cat_name, task_descr, root):
     task_id += 1
 
 
-def mark_task_as_done(listbox_name, index_selected):
-    id_selected_task = int(listbox_name.split()[1].replace(":", ""))
+def mark_task_as_done(selected_name, index_selected):
+    if selected_name is None:
+        CTkMessagebox(window, width=250, height=150, title="Error", font=M_FONT,
+                      message="Bitte wählen Sie zuerst eine Aufgabe aus!")
+        return None
+
+    id_selected_task = int(selected_name.split()[1].replace(":", ""))
 
     for task in active_tasks:
         if task.id == id_selected_task:
@@ -292,6 +297,11 @@ def load_and_update():
 
 
 def delete_task(selected_name, index_selected):
+    if selected_name is None:
+        CTkMessagebox(window, width=250, height=150, title="Error", font=M_FONT,
+                      message="Bitte wählen Sie zuerst eine Aufgabe aus!")
+        return None
+
     id_selected_task = int(selected_name.split()[1].replace(":", ""))
 
     for task in active_tasks:
@@ -360,7 +370,7 @@ set_appearance_mode("dark")
 set_default_color_theme("dark-blue")
 
 done_button = CTkButton(window, text="✔", font=M_FONT, height=40, width=40, corner_radius=8,
-                        command=lambda: mark_task_as_done(listbox_name=task_scrollbar.get(),
+                        command=lambda: mark_task_as_done(selected_name=task_scrollbar.get(),
                                                           index_selected=task_scrollbar.curselection()))
 done_button.grid(row=0, column=4, padx=5, pady=5)
 
