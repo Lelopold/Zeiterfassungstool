@@ -1,0 +1,22 @@
+Ziel: Einfache Erfassung Zeitaufwand für Aufgaben und Kunden
+- einfaches Hin- und Herwechseln von Aufgaben (evtl. mit Shortcuts)
+- wochenweise und tagesweise Bericht über Zeitaufwand für Aufgaben
+- einfaches Zuordnen der Aufgaben zu Kunden/Kategorien
+- einfaches Erstellen von Aufgaben (evtl. Shortcut)
+- Übersichtlichkeit wichtig
+
+Einzelfunktionen:
+Aufgabe hinzufügen
+Aufgabe entfernen
+Kategorie hinzufügen
+Aufgaben Kategorien zuordnen
+Zeit pausieren
+Zeit fortsetzen
+Aufgaben abhaken
+Kategorien anlegen
+Kategorien abhaken / deaktivieren
+ggf. Aufgabenarchiv
+
+dafür: 
+Klasse Task: bool done, str name, int time
+Klasse Kategorie: str name, list tasks
