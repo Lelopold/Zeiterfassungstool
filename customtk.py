@@ -9,15 +9,6 @@ import datetime as dt
 import keyboard
 
 
-def add_second():
-    global time_active_task
-    time_active_task += 1
-
-
-def change_active_task():
-    pass
-
-
 def disable_buttons():
     for button in buttons:
         button.configure(state="disabled")
@@ -164,6 +155,7 @@ def destroy_pop_ups(pop_up):
     enable_buttons()
 
     pop_up.destroy()
+    pop_up.update()
 
 
 def add_category(name, root):
@@ -176,25 +168,46 @@ def add_category(name, root):
 
 
 def archive_category_gui():
-    pass
-#     disable_buttons()
-#     new_window = CTkToplevel()
-#     new_window.geometry("320x340")
-#     new_window.title("Neue Aufgabe anlegen")
-#
-#     new_window.grab_set()
-#     new_window.focus()
-#
-#     cat_label = CTkLabel(cat_frame, text="Kategorie:", font=XL_FONT)
-#     cat_label.grid(row=0, column=0, padx=5, pady=5)
-#
-#     cat_names = [cat.name for cat in active_cats]
-#
-#     cat_frame.columnconfigure(1, weight=1)
-#     cat_dropbox = CTkOptionMenu(cat_frame, font=L_FONT, width=158, values=cat_names, fg_color=GREY_COL,
-#                                 dropdown_fg_color=GREY_COL, dropdown_font=L_FONT, button_color=GREY_COL,
-#                                 button_hover_color=HOVER_GREY, dropdown_hover_color=HOVER_GREY)
-#     cat_dropbox.grid(row=0, column=1, padx=5, pady=5)
+    if len(active_cats) == 0:
+        CTkMessagebox(window, width=250, height=150, title="Error", font=M_FONT,
+                      message="Bitte legen Sie zuerst eine Kategorie an!")
+        return None
+
+    disable_buttons()
+
+    new_window = CTkToplevel()
+    new_window.geometry("320x340")
+    new_window.title("Neue Aufgabe anlegen")
+
+    new_window.grab_set()
+    new_window.focus()
+
+    cat_names = [cat.name for cat in active_cats]
+
+    cat_dropbox = CTkOptionMenu(new_window, font=L_FONT, width=170, values=cat_names, fg_color=GREY_COL,
+                                dropdown_fg_color=GREY_COL, dropdown_font=L_FONT, button_color=GREY_COL,
+                                button_hover_color=HOVER_GREY, dropdown_hover_color=HOVER_GREY)
+    cat_dropbox.grid(row=0, column=0, padx=5, pady=5)
+
+    archive_button = CTkButton(new_window, text="Archivieren", font=M_FONT, height=40, width=40, corner_radius=8,
+                               command=lambda: archive_category(cat_dropbox.get(), new_window))
+    archive_button.grid(row=1, column=0, padx=5, pady=5)
+
+    new_window.columnconfigure(0, weight=1)
+
+
+def archive_category(cat_name: str, root: CTkToplevel):
+    enable_buttons()
+    destroy_pop_ups(root)
+
+    for cat in active_cats:
+        if cat.name == cat_name:
+            if len(cat.active_tasks) > 0:
+                CTkMessagebox(window, width=280, height=150, title="Error", font=M_FONT,
+                              message="Diese Kategorie hat noch aktive Aufgaben. Bitte haken Sie diese erst ab!")
+            else:
+                active_cats.remove(cat)
+                done_cats.append(cat)
 
 
 def show_details(selected_name: str):
@@ -279,15 +292,18 @@ def load_and_update():
 
     try:
         with open("data.json", "r") as file:
-            data = json.load(file)
+            try:
+                data = json.load(file)
+            except json.decoder.JSONDecodeError:
+                pass
+            else:
+                task_id = data["task_id"]
 
-            task_id = data["task_id"]
+                for cat in data["active_cats"]:
+                    active_cats.append(import_attributes(cat))
 
-            for cat in data["active_cats"]:
-                active_cats.append(import_attributes(cat))
-
-            for cat in data["done_cats"]:
-                done_cats.append(import_attributes(cat))
+                for cat in data["done_cats"]:
+                    done_cats.append(import_attributes(cat))
 
         for cat in active_cats:
             for task in cat.active_tasks:
@@ -297,6 +313,7 @@ def load_and_update():
 
 
 def delete_task(selected_name, index_selected):
+
     if selected_name is None:
         CTkMessagebox(window, width=250, height=150, title="Error", font=M_FONT,
                       message="Bitte wählen Sie zuerst eine Aufgabe aus!")
@@ -315,30 +332,90 @@ def delete_task(selected_name, index_selected):
 
 
 def switch_tasks_gui():
-    disable_buttons()
+    global selection_index
 
-    new_window = CTkToplevel()
-    new_window.geometry("280x340")
-    new_window.title("Aufgabe wechseln")
+    if len(active_tasks) == 0:
+        CTkMessagebox(window, width=280, height=150, title="Error", font=M_FONT,
+                      message="Es existieren aktuell keine Aufgaben zum Auswählen!")
+        return None
+    else:
+        disable_buttons()
 
-    new_window.grab_set()
-    new_window.focus()
+        new_window = CTkToplevel()
+        new_window.geometry("260x360")
+        new_window.title("Aufgabe wechseln")
+        new_window.columnconfigure(0, weight=1)
+        new_window.columnconfigure(1, weight=1)
 
-    task_switch_bar = CTkListbox(new_window, height=210, width=250, fg_color=BLUE_COL, border_width=0, corner_radius=20,
-                                 font=M_FONT, button_color=GREY_COL, hover_color=HOVER_GREY, highlight_color=HOVER_GREY)
-    task_switch_bar.grid(row=0, column=0, columnspan=1, padx=5, pady=10)
+        new_window.grab_set()
+        new_window.focus()
 
-    for task in active_tasks:
-        task_switch_bar.insert(END, f"ID {task.id}: {task.name} ({task.category})")
+        task_switch_bar = CTkListbox(new_window, height=260, width=200, fg_color=BLUE_COL, border_width=0, corner_radius=20,
+                                     font=M_FONT, button_color=GREY_COL, hover_color=HOVER_GREY, highlight_color=HOVER_GREY)
+        task_switch_bar.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+
+        selection_index = 0
+
+        for task in active_tasks:
+            task_switch_bar.insert(END, f"ID {task.id}: {task.name} ({task.category})")
+
+        task_switch_bar.select(selection_index)
+
+        ok_button = CTkButton(new_window, text="OK", width=100, height=30, corner_radius=8, font=M_FONT,
+                              command=lambda: set_active_task(task_switch_bar.get(), new_window))
+        ok_button.grid(row=2, column=1)
+
+        pause_button = CTkButton(new_window, text="Pausieren", width=100, height=30, corner_radius=8, font=M_FONT,
+                              command=lambda: pause_active_task(new_window))
+        pause_button.grid(row=2, column=0)
+
+        # keyboard.add_hotkey("enter", lambda: set_active_task(task_switch_bar.get(), new_window))
+        keyboard.add_hotkey("down", lambda: task_switch_bar.select(modify_selected_index(True)))
+        keyboard.add_hotkey("up", lambda: task_switch_bar.select(modify_selected_index(False)))
 
 
-def set_active_task(selected_name: str):
+def modify_selected_index(down: bool):
+    global selection_index
+
+    if down:
+        selection_index = (selection_index + 1) % len(active_tasks)
+    else:
+        selection_index = (selection_index - 1) % len(active_tasks)
+    return selection_index
+
+
+def set_active_task(selected_name: str, root: CTkToplevel):
+    global timer
     global running_task
+
+    if timer is not None:
+        window.after_cancel(timer)
+
     id_selected_task = int(selected_name.split()[1].replace(":", ""))
 
     for task in active_tasks:
         if task.id == id_selected_task:
             running_task = task
+            count_time()
+
+    destroy_pop_ups(root)
+
+
+def pause_active_task(root: CTkToplevel):
+    global timer
+
+    if timer is not None:
+        window.after_cancel(timer)
+        timer = None
+    destroy_pop_ups(root)
+
+
+def count_time():
+    global timer
+
+    timer = window.after(1000, count_time)
+    running_task.time_used += 1
+    print(running_task.time_used)
 
 
 XS_FONT = ("Helvetica", 10, "bold")
@@ -359,8 +436,11 @@ active_cats = []
 done_cats = []
 active_tasks = []
 task_id = 1
-running_task = None
-time_active_task = 0
+change_task_is_open = False
+running_task: Task
+time_running_task = 0
+selection_index = 0
+timer = None
 
 
 window = CTk()
@@ -378,8 +458,8 @@ add_button = CTkButton(window, text="+", font=XL_FONT, height=40, width=40, corn
 add_button.grid(row=0, column=3, padx=5, pady=5)
 
 delete_button = CTkButton(window, text="➖", font=S_FONT, height=40, width=40, corner_radius=8,
-                          command=lambda: delete_task(selected_name=task_scrollbar.get(),
-                                                      index_selected=task_scrollbar.curselection()))
+                          command=lambda: [delete_task(selected_name=task_scrollbar.get(),
+                                                       index_selected=task_scrollbar.curselection())])
 delete_button.grid(row=0, column=2, padx=5, pady=5)
 
 headline = CTkLabel(window, text="Aktuelle Aufgaben", font=HEADLINE_FONT)
@@ -422,9 +502,6 @@ archive_cat.grid(row=2, column=2, pady=10, columnspan=3)
 load_and_update()
 
 buttons = [new_cat_btn, day_info, archive_cat, done_button, add_button, delete_button]
-
-if running_task is not None:
-    window.after(1000, func=add_second)
 
 keyboard.add_hotkey("ctrl+alt+a", switch_tasks_gui)
 
