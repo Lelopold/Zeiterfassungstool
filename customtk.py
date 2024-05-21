@@ -5,7 +5,7 @@ from CTkListbox import *
 from category import Category
 from task import Task
 from CTkMessagebox import *
-import datetime as dt
+from datetime import *
 import keyboard
 
 
@@ -108,6 +108,9 @@ def mark_task_as_done(selected_name, index_selected):
         return None
 
     id_selected_task = int(selected_name.split()[1].replace(":", ""))
+    if id_selected_task == running_task.id:
+        pause_running_task()
+
 
     for task in active_tasks:
         if task.id == id_selected_task:
@@ -220,6 +223,16 @@ def show_details(selected_name: str):
                 category_info.insert(END, f"Kategorie: {task.category}")
                 description.delete("0.0", END)
                 description.insert(END, f"Beschreibung: {task.description}")
+                used_time_info.delete("0.0", END)
+                used_time_str = f"{int(task.time_used//3600)} h {int(task.time_used % 3600)//60} min {task.time_used%60} s"
+                used_time_info.insert(END, f"genutzte Zeit: {used_time_str}")
+
+
+def show_daily_report(date: str):
+    if date not in days:
+        CTkMessagebox(window, width=250, height=150, title="Error", font=M_FONT,
+                      message="Der gesuchte Tag wurde leider nicht gefunden!")
+        return None
 
 
 def extract_attributes(cat):
@@ -289,6 +302,7 @@ def save():
 
 def load_and_update():
     global task_id
+    global day_data
 
     try:
         with open("data.json", "r") as file:
@@ -305,6 +319,8 @@ def load_and_update():
                 for cat in data["done_cats"]:
                     done_cats.append(import_attributes(cat))
 
+                day_data = data["days"]
+
         for cat in active_cats:
             for task in cat.active_tasks:
                 task_scrollbar.insert(END, f"ID {task.id}: {task.name}")
@@ -320,6 +336,9 @@ def delete_task(selected_name, index_selected):
         return None
 
     id_selected_task = int(selected_name.split()[1].replace(":", ""))
+
+    if id_selected_task == running_task.id:
+        pause_running_task()
 
     for task in active_tasks:
         if task.id == id_selected_task:
@@ -350,6 +369,7 @@ def switch_tasks_gui():
         new_window.grab_set()
         new_window.focus()
 
+
         task_switch_bar = CTkListbox(new_window, height=260, width=200, fg_color=BLUE_COL, border_width=0, corner_radius=20,
                                      font=M_FONT, button_color=GREY_COL, hover_color=HOVER_GREY, highlight_color=HOVER_GREY)
         task_switch_bar.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
@@ -366,7 +386,7 @@ def switch_tasks_gui():
         ok_button.grid(row=2, column=1)
 
         pause_button = CTkButton(new_window, text="Pausieren", width=100, height=30, corner_radius=8, font=M_FONT,
-                              command=lambda: pause_active_task(new_window))
+                                 command=lambda: [pause_running_task(new_window), destroy_pop_ups(new_window)])
         pause_button.grid(row=2, column=0)
 
         # keyboard.add_hotkey("enter", lambda: set_active_task(task_switch_bar.get(), new_window))
@@ -388,10 +408,14 @@ def set_active_task(selected_name: str, root: CTkToplevel):
     global timer
     global running_task
 
+    id_selected_task = int(selected_name.split()[1].replace(":", ""))
+
+    if running_task is not None:
+        if running_task.id == id_selected_task:
+            return None
+
     if timer is not None:
         window.after_cancel(timer)
-
-    id_selected_task = int(selected_name.split()[1].replace(":", ""))
 
     for task in active_tasks:
         if task.id == id_selected_task:
@@ -401,13 +425,12 @@ def set_active_task(selected_name: str, root: CTkToplevel):
     destroy_pop_ups(root)
 
 
-def pause_active_task(root: CTkToplevel):
+def pause_running_task():
     global timer
 
     if timer is not None:
         window.after_cancel(timer)
         timer = None
-    destroy_pop_ups(root)
 
 
 def count_time():
@@ -415,6 +438,11 @@ def count_time():
 
     timer = window.after(1000, count_time)
     running_task.time_used += 1
+    selected_name = task_scrollbar.get()
+    if selected_name is not None:
+        if running_task.id == int(selected_name.split()[1].replace(":", "")):
+            show_details(selected_name)
+
     print(running_task.time_used)
 
 
@@ -438,10 +466,10 @@ active_tasks = []
 task_id = 1
 change_task_is_open = False
 running_task: Task
-time_running_task = 0
 selection_index = 0
 timer = None
-
+current_date = str(date.today())
+day_data = None
 
 window = CTk()
 window.title("Zeiterfassungstool")
@@ -480,13 +508,17 @@ detail_headline.grid(row=0, column=0)
 detail_frame.grid_rowconfigure(0, weight=10)
 detail_frame.grid_columnconfigure(0, weight=10)
 
-description = CTkTextbox(detail_frame, width=300, height=200, corner_radius=15, border_width=0, font=M_FONT)
+description = CTkTextbox(detail_frame, width=300, height=160, corner_radius=15, border_width=0, font=M_FONT)
 description.grid(row=1, column=0, pady=5)
-description.insert(END, text="Beschreibung:\nLorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.")
+description.insert(END, text="Beschreibung:")
 
-category_info = CTkTextbox(detail_frame, width=300, height=30, corner_radius=15, border_width=0, font=M_FONT)
+category_info = CTkTextbox(detail_frame, width=300, height=20, corner_radius=15, border_width=0, font=M_FONT)
 category_info.grid(row=2, column=0, pady=5)
-category_info.insert(END, text="Kategorie: Lorem ipsum dolor sit amet")
+category_info.insert(END, text="Kategorie:")
+
+used_time_info = CTkTextbox(detail_frame, width=300, height=20, corner_radius=15, border_width=0, font=M_FONT)
+used_time_info.grid(row=3, column=0, pady=5)
+used_time_info.insert(END, text="genutzte Zeit:")
 
 day_info = CTkButton(window, width=100, height=40, corner_radius=15, border_width=0, font=M_FONT, text="Tagesbericht")
 day_info.grid(row=2, column=0, padx=5, sticky="w")

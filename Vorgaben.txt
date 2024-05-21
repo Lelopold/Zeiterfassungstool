@@ -20,3 +20,7 @@ ggf. Aufgabenarchiv
 dafür: 
 Klasse Task: bool done, str name, int time
 Klasse Kategorie: str name, list tasks
+
+TO-DO's:
+- Code in Klassen reorganisieren
+- Mapped Listbox statt Listbox verwenden

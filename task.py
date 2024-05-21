@@ -5,3 +5,4 @@ class Task:
         self.time_used = 0
         self.category = category
         self.id = id_input
+        self.active = True

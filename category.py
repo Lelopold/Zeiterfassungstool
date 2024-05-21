@@ -2,8 +2,10 @@ from task import Task
 
 
 class Category:
-    def __init__(self, name):
+    def __init__(self, name, id):
         self.name = name
-        self.active_tasks = []
-        self.done_tasks = []
+        self.tasks = []
+        self.id = id
         self.time_used = 0
+        self.active = True
+        self.active_task_count = 0
