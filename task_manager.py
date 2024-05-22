@@ -445,7 +445,7 @@ class TaskManager:
         self.pop_up.grab_set()
         self.pop_up.focus()
 
-        table_header = ["Kategorie", "Aufgabe", "genutzte Zeit"]
+        table_header = [["Kategorie", "Aufgabe", "genutzte Zeit"]]
         data_table = CTkTable(self.pop_up, row=1, column=3, values=table_header)
         data_table.grid(row=0, column=0, padx=10, pady=10)
 
