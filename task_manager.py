@@ -446,8 +446,17 @@ class TaskManager:
         self.pop_up.focus()
 
         table_header = [["Kategorie", "Aufgabe", "genutzte Zeit"]]
-        data_table = CTkTable(self.pop_up, row=1, column=3, values=table_header)
-        data_table.grid(row=0, column=0, padx=10, pady=10)
+        data_table = CTkTable(self.pop_up, row=1, column=3, values=table_header, width=200, font=L_FONT)
+        data_table.grid(row=0, column=0, padx=10, pady=10, columnspan=3)
+
+        back_button = CTkButton(self.pop_up, text="Zurück", width=100, height=30, corner_radius=8, font=M_FONT)
+        back_button.grid(row=1, column=1, padx=5, pady=5)
+
+        next_button = CTkButton(self.pop_up, text="Nächster Tag", width=100, height=30, corner_radius=8, font=M_FONT)
+        next_button.grid(row=1, column=2, padx=5, pady=5)
+
+        prev_button = CTkButton(self.pop_up, text="Vorheriger Tag", width=100, height=30, corner_radius=8, font=M_FONT)
+        prev_button.grid(row=1, column=0, padx=5, pady=5)
 
     def save(self):
         data = {"task_id": self.task_id,
