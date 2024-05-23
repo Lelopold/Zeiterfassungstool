@@ -43,6 +43,7 @@ class TaskManager:
         self.archive_cat_btn = None
         self.buttons = None
         self.pop_up = None
+        self.task_switch_bar = None
         self.active_category_count = 0
         self.task_id = 1
         self.category_id = 1
@@ -58,8 +59,9 @@ class TaskManager:
         self.day_data = {}
         self.current_date = str(datetime.today().date())
 
-
         keyboard.add_hotkey("ctrl+alt+a", self.switch_active_task_gui)
+        keyboard.add_hotkey("down", lambda: self.change_selection(False))
+        keyboard.add_hotkey("up", lambda: self.change_selection(True))
 
     def home_gui(self):
         self.window = CTk()
@@ -192,8 +194,6 @@ class TaskManager:
                           message="Bitte legen Sie zuerst eine Kategorie an!")
             return None
 
-        print(self.active_category_count)
-
         self.disable_buttons()
         self.pop_up = CTkToplevel()
         self.pop_up.configure(padx=10, pady=10)
@@ -204,7 +204,7 @@ class TaskManager:
 
         self.pop_up.protocol("WM_DELETE_WINDOW", func=lambda: [self.pop_up.destroy(), self.enable_buttons()])
 
-        category_dropbox = CTkOptionMenu(self.pop_up, font=L_FONT, width=170, values=list(self.category_map.keys()),
+        category_dropbox = CTkOptionMenu(self.pop_up, font=L_FONT, width=220, values=list(self.category_map.keys()),
                                          fg_color=GREY_COL, dropdown_fg_color=GREY_COL, dropdown_font=L_FONT,
                                          button_color=GREY_COL, button_hover_color=HOVER_GREY,
                                          dropdown_hover_color=HOVER_GREY)
@@ -236,6 +236,7 @@ class TaskManager:
                 return None
 
         selected_category.active = False
+        self.active_category_count -= 1
 
         tasks_to_delete = []
         for task_str, item in self.task_map.items():
@@ -254,7 +255,7 @@ class TaskManager:
 
     def new_task_gui(self):
         if self.active_category_count == 0:
-            CTkMessagebox(self.pop_up, width=250, height=150, title="Error", font=M_FONT,
+            CTkMessagebox(self.window, width=250, height=150, title="Error", font=M_FONT,
                           message="Bitte legen Sie zuerst eine Kategorie an!")
             return None
 
@@ -358,7 +359,6 @@ class TaskManager:
         selected_task.category.tasks.remove(selected_task)
         self.task_map.pop(task_str, None)
         self.task_scrollbar.delete(index)
-        print(self.task_scrollbar.get)
 
         del selected_task
 
@@ -387,34 +387,40 @@ class TaskManager:
 
             self.pop_up = CTkToplevel()
             self.pop_up.title("Aufgabe wechseln")
-            self.pop_up.columnconfigure(0, weight=1)
-            self.pop_up.columnconfigure(1, weight=1)
 
             self.pop_up.grab_set()
             self.pop_up.focus()
 
-            task_switch_bar = CTkListbox(self.pop_up, height=260, width=200, fg_color=BLUE_COL, border_width=0,
-                                         corner_radius=20,
-                                         font=M_FONT, button_color=GREY_COL, hover_color=HOVER_GREY,
-                                         highlight_color=HOVER_GREY)
-            task_switch_bar.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+            self.pop_up.protocol("WM_DELETE_WINDOW", func=lambda: [self.pop_up.destroy(), self.enable_buttons(),
+                                                                   self.enable_switch_active_task_gui])
+
+            self.task_switch_bar = CTkListbox(self.pop_up, height=250, width=200, fg_color=BLUE_COL, border_width=0,
+                                              corner_radius=20, font=M_FONT, button_color=GREY_COL,
+                                              hover_color=HOVER_GREY, highlight_color=HOVER_GREY)
+            self.task_switch_bar.grid(row=0, column=0, columnspan=2, padx=10, pady=5)
 
             for task_str, item in self.task_map.items():
-                task_switch_bar.insert(END, f"{task_str}")
+                self.task_switch_bar.insert(END, f"{task_str}")
 
-            task_switch_bar.select(0)
+            self.task_switch_bar.select(0)
 
             ok_button = CTkButton(self.pop_up, text="OK", width=100, height=30, corner_radius=8, font=M_FONT,
-                                  command=lambda: [self.pop_up.destroy(), self.set_active_task(task_switch_bar.get())])
+                                  command=lambda: [self.pop_up.destroy(),
+                                                   self.set_active_task(self.task_switch_bar.get())])
             ok_button.grid(row=2, column=1, padx=5, pady=5)
             pause_button = CTkButton(self.pop_up, text="Pausieren", width=100, height=30, corner_radius=8, font=M_FONT,
                                      command=lambda: [self.pop_up.destroy(), self.pause_running_task()])
             pause_button.grid(row=2, column=0, padx=5, pady=5)
 
-            keyboard.add_hotkey("down", lambda: task_switch_bar.select((task_switch_bar.curselection() + 1)
-                                                                       % len(self.task_map)))
-            keyboard.add_hotkey("up", lambda: task_switch_bar.select((task_switch_bar.curselection() - 1)
-                                                                     % len(self.task_map)))
+    def change_selection(self, up: bool):
+        if self.change_task_is_open:
+            if up:
+                self.task_switch_bar.select((self.task_switch_bar.curselection() - 1) % len(self.task_map))
+            else:
+                self.task_switch_bar.select((self.task_switch_bar.curselection() + 1) % len(self.task_map))
+
+    def enable_switch_active_task_gui(self):
+        self.change_task_is_open = False
 
     def set_active_task(self, task_str: str):
         self.enable_buttons()
@@ -437,10 +443,8 @@ class TaskManager:
                 "category": f"ID {self.running_task.category.id}: {self.running_task.category.name}",
                 "time_used": 1
             }
-            print("not found")
         else:
             self.day_data[self.current_date][f"ID {self.running_task.id}: {self.running_task.name}"]["time_used"] += 1
-            print("done")
 
         if task_str is not None:
             try:
@@ -448,9 +452,6 @@ class TaskManager:
                     self.show_details(task_str)
             except KeyError:
                 pass
-
-        print(self.running_task.time_used)
-        print(self.day_data)
 
     def pause_running_task(self):
         self.enable_buttons()
@@ -481,16 +482,23 @@ class TaskManager:
         date_headline.grid(row=0, column=0, columnspan=3)
 
         table_data = [["Kategorie", "Aufgabe", "genutzte Zeit"]]
-        data_table = CTkTable(self.pop_up, row=6, column=3, values=table_data, width=200, font=L_FONT,
-                              border_color=BLUE_COL, border_width=7)
-        data_table.grid(row=1, column=0, padx=10, pady=10, columnspan=3)
 
         if selected_date in self.day_data.keys():
             for task_str, details in self.day_data[selected_date].items():
-                new_row = [details["category"], task_str, str(details["time_used"])]
+                time_str = (f"{details["time_used"] // 3600} h {(details["time_used"] % 3600) // 60} min "
+                            f"{details["time_used"] % 60} s")
+
+                new_row = [details["category"], task_str, time_str]
                 table_data.append(new_row)
 
-        data_table.update_values(table_data)
+        if len(table_data) < 6:
+            row_count = 6
+        else:
+            row_count = len(table_data)
+
+        data_table = CTkTable(self.pop_up, column=3, row=row_count, values=table_data, width=200, font=L_FONT,
+                              border_color=BLUE_COL, border_width=7, header_color=BLUE_COL)
+        data_table.grid(row=1, column=0, padx=10, pady=10, columnspan=3)
 
         back_button = CTkButton(self.pop_up, text="Zurück", width=180, height=30, corner_radius=8, font=M_FONT,
                                 command=lambda: [self.pop_up.destroy(), self.enable_buttons()])
@@ -506,13 +514,9 @@ class TaskManager:
                                                  self.daily_report_gui(str(date - timedelta(days=1)))])
         prev_button.grid(row=2, column=0, padx=5, pady=5)
 
-        # Set min size of pop-up window.
-        min_pop_up_width = 640
-        min_pop_up_height = 280
-
-        # Get the size of the pop-up window
-        pop_up_width = max(self.pop_up.winfo_width(), min_pop_up_width)
-        pop_up_height = max(self.pop_up.winfo_height(), min_pop_up_height)
+        # Set the size of the pop-up window
+        pop_up_width = 640
+        pop_up_height = 280 + (row_count - 6) * 30
 
         # Position the pop-up window over the main window
         main_window_x = self.window.winfo_x()
@@ -562,15 +566,13 @@ class TaskManager:
                     new_category = Category(name=name, cat_id=cat_id)
                     new_category.active = data["category_map"][category_str]["active"]
                     new_category.active_task_count = data["category_map"][category_str]["active_task_count"]
-                    print(new_category.name, new_category.id, new_category.active, new_category.active_task_count)
                     self.category_map[category_str] = new_category
                     for task_item in data["category_map"][category_str]["tasks"]:
-                        task_name, task_id, description= task_item["name"], task_item["id"], task_item["description"]
-                        new_task = Task(name=task_name, description=description, category=new_category, id_input=task_id)
+                        task_name, task_id, description = task_item["name"], task_item["id"], task_item["description"]
+                        new_task = Task(task_name, description, new_category, task_id)
                         new_task.time_used = task_item["time_used"]
                         new_task.active = task_item["active"]
                         new_category.tasks.append(new_task)
-                        print(new_task.name, new_task.description, new_task.time_used, new_task.active)
                         self.task_map[f"ID {new_task.id}: {new_task.name}"] = new_task
         except (FileNotFoundError, KeyError, json.decoder.JSONDecodeError):
             pass
