@@ -7,6 +7,7 @@ from task import Task
 from CTkMessagebox import *
 import keyboard
 from CTkTable import CTkTable
+from datetime import datetime, timedelta
 
 XS_FONT = ("Helvetica", 10, "bold")
 S_FONT = ("Helvetica", 12, "bold")
@@ -42,7 +43,7 @@ class TaskManager:
         self.archive_cat_btn = None
         self.buttons = None
         self.pop_up = None
-        self.active_category_count = 1
+        self.active_category_count = 0
         self.task_id = 1
         self.category_id = 1
 
@@ -54,7 +55,9 @@ class TaskManager:
         self.task_is_running = False
         self.selection_index = 0
         self.timer = None
-        self.day_data = None
+        self.day_data = {}
+        self.current_date = str(datetime.today().date())
+
 
         keyboard.add_hotkey("ctrl+alt+a", self.switch_active_task_gui)
 
@@ -112,7 +115,7 @@ class TaskManager:
         self.task_time_used_info.insert(END, text="genutzte Zeit:")
 
         self.day_info_btn = CTkButton(self.window, width=100, height=40, corner_radius=15, border_width=0, font=M_FONT,
-                                      text="Tagesbericht", command=self.daily_report_gui)
+                                      text="Tagesbericht", command=lambda: self.daily_report_gui(self.current_date))
         self.day_info_btn.grid(row=2, column=0, padx=5, sticky="w")
 
         self.new_cat_btn = CTkButton(self.window, width=100, height=40, corner_radius=15, border_width=0, font=M_FONT,
@@ -127,10 +130,12 @@ class TaskManager:
                         self.day_info_btn, self.add_button]
 
         self.load_and_update()
+        self.load_day_data()
 
         self.window.mainloop()
 
-        self.save()
+        self.save_tasks()
+        self.save_day_data()
 
     def disable_buttons(self):
         for button in self.buttons:
@@ -182,6 +187,13 @@ class TaskManager:
         self.category_id += 1
 
     def archive_category_gui(self):
+        if self.active_category_count == 0:
+            CTkMessagebox(self.pop_up, width=250, height=150, title="Error", font=M_FONT,
+                          message="Bitte legen Sie zuerst eine Kategorie an!")
+            return None
+
+        print(self.active_category_count)
+
         self.disable_buttons()
         self.pop_up = CTkToplevel()
         self.pop_up.configure(padx=10, pady=10)
@@ -419,6 +431,17 @@ class TaskManager:
         self.timer = self.window.after(1000, self.count_time)
         self.running_task.time_used += 1
         task_str = self.task_scrollbar.get()
+
+        if f"ID {self.running_task.id}: {self.running_task.name}" not in self.day_data[self.current_date].keys():
+            self.day_data[self.current_date][f"ID {self.running_task.id}: {self.running_task.name}"] = {
+                "category": f"ID {self.running_task.category.id}: {self.running_task.category.name}",
+                "time_used": 1
+            }
+            print("not found")
+        else:
+            self.day_data[self.current_date][f"ID {self.running_task.id}: {self.running_task.name}"]["time_used"] += 1
+            print("done")
+
         if task_str is not None:
             try:
                 if self.running_task == self.task_map[task_str]:
@@ -427,6 +450,7 @@ class TaskManager:
                 pass
 
         print(self.running_task.time_used)
+        print(self.day_data)
 
     def pause_running_task(self):
         self.enable_buttons()
@@ -436,7 +460,13 @@ class TaskManager:
             self.window.after_cancel(self.timer)
             self.timer = None
 
-    def daily_report_gui(self):
+    def daily_report_gui(self, selected_date: str):
+        year = int(selected_date.split("-")[0])
+        month = int(selected_date.split("-")[1])
+        day = int(selected_date.split("-")[2])
+        date = datetime(year, month, day).date()
+        date_str = f"{day}.{month}.{year}"
+
         self.disable_buttons()
 
         self.pop_up = CTkToplevel()
@@ -445,20 +475,55 @@ class TaskManager:
         self.pop_up.grab_set()
         self.pop_up.focus()
 
-        table_header = [["Kategorie", "Aufgabe", "genutzte Zeit"]]
-        data_table = CTkTable(self.pop_up, row=1, column=3, values=table_header, width=200, font=L_FONT)
-        data_table.grid(row=0, column=0, padx=10, pady=10, columnspan=3)
+        self.pop_up.protocol("WM_DELETE_WINDOW", func=lambda: [self.pop_up.destroy(), self.enable_buttons()])
 
-        back_button = CTkButton(self.pop_up, text="Zurück", width=100, height=30, corner_radius=8, font=M_FONT)
-        back_button.grid(row=1, column=1, padx=5, pady=5)
+        date_headline = CTkLabel(self.pop_up, text=date_str, font=HEADLINE_FONT)
+        date_headline.grid(row=0, column=0, columnspan=3)
 
-        next_button = CTkButton(self.pop_up, text="Nächster Tag", width=100, height=30, corner_radius=8, font=M_FONT)
-        next_button.grid(row=1, column=2, padx=5, pady=5)
+        table_data = [["Kategorie", "Aufgabe", "genutzte Zeit"]]
+        data_table = CTkTable(self.pop_up, row=6, column=3, values=table_data, width=200, font=L_FONT,
+                              border_color=BLUE_COL, border_width=7)
+        data_table.grid(row=1, column=0, padx=10, pady=10, columnspan=3)
 
-        prev_button = CTkButton(self.pop_up, text="Vorheriger Tag", width=100, height=30, corner_radius=8, font=M_FONT)
-        prev_button.grid(row=1, column=0, padx=5, pady=5)
+        if selected_date in self.day_data.keys():
+            for task_str, details in self.day_data[selected_date].items():
+                new_row = [details["category"], task_str, str(details["time_used"])]
+                table_data.append(new_row)
 
-    def save(self):
+        data_table.update_values(table_data)
+
+        back_button = CTkButton(self.pop_up, text="Zurück", width=180, height=30, corner_radius=8, font=M_FONT,
+                                command=lambda: [self.pop_up.destroy(), self.enable_buttons()])
+        back_button.grid(row=2, column=1, padx=5, pady=5)
+
+        next_button = CTkButton(self.pop_up, text="Nächster Tag", width=180, height=30, corner_radius=8, font=M_FONT,
+                                command=lambda: [self.pop_up.destroy(),
+                                                 self.daily_report_gui(str(date + timedelta(days=1)))])
+        next_button.grid(row=2, column=2, padx=5, pady=5)
+
+        prev_button = CTkButton(self.pop_up, text="Vorheriger Tag", width=180, height=30, corner_radius=8, font=M_FONT,
+                                command=lambda: [self.pop_up.destroy(),
+                                                 self.daily_report_gui(str(date - timedelta(days=1)))])
+        prev_button.grid(row=2, column=0, padx=5, pady=5)
+
+        # Set min size of pop-up window.
+        min_pop_up_width = 640
+        min_pop_up_height = 280
+
+        # Get the size of the pop-up window
+        pop_up_width = max(self.pop_up.winfo_width(), min_pop_up_width)
+        pop_up_height = max(self.pop_up.winfo_height(), min_pop_up_height)
+
+        # Position the pop-up window over the main window
+        main_window_x = self.window.winfo_x()
+        main_window_y = self.window.winfo_y()
+
+        # Center the pop-up window over the main window
+        pop_up_x = main_window_x + (self.window.winfo_width() // 2) - (pop_up_width // 2)
+        pop_up_y = main_window_y + (self.window.winfo_height() // 2) - (pop_up_height // 2)
+        self.pop_up.geometry(f"{pop_up_width}x{pop_up_height}+{pop_up_x}+{pop_up_y}")
+
+    def save_tasks(self):
         data = {"task_id": self.task_id,
                 "category_id": self.category_id,
                 "category_map": {}
@@ -482,29 +547,46 @@ class TaskManager:
         with open("data.json", "w") as file:
             json.dump(data, file)
 
+    def save_day_data(self):
+        with open("days.json", "w") as file:
+            json.dump(self.day_data, file)
+
     def load_and_update(self):
-        with open("data.json", "r") as file:
-            data = json.load(file)
-            self.task_id = data["task_id"]
-            self.category_id = data["category_id"]
-            for category_str, item in data["category_map"].items():
-                name, cat_id = item["name"], item["id"]
-                new_category = Category(name=name, cat_id=cat_id)
-                new_category.active = data["category_map"][category_str]["active"]
-                new_category.active_task_count = data["category_map"][category_str]["active_task_count"]
-                print(new_category.name, new_category.id, new_category.active, new_category.active_task_count)
-                self.category_map[category_str] = new_category
-                for task_item in data["category_map"][category_str]["tasks"]:
-                    task_name, task_id, description= task_item["name"], task_item["id"], task_item["description"]
-                    new_task = Task(name=task_name, description=description, category=new_category, id_input=task_id)
-                    new_task.time_used = task_item["time_used"]
-                    new_task.active = task_item["active"]
-                    new_category.tasks.append(new_task)
-                    print(new_task.name, new_task.description, new_task.time_used, new_task.active)
-                    self.task_map[f"ID {new_task.id}: {new_task.name}"] = new_task
+        try:
+            with open("data.json", "r") as file:
+                data = json.load(file)
+                self.task_id = data["task_id"]
+                self.category_id = data["category_id"]
+                for category_str, item in data["category_map"].items():
+                    name, cat_id = item["name"], item["id"]
+                    new_category = Category(name=name, cat_id=cat_id)
+                    new_category.active = data["category_map"][category_str]["active"]
+                    new_category.active_task_count = data["category_map"][category_str]["active_task_count"]
+                    print(new_category.name, new_category.id, new_category.active, new_category.active_task_count)
+                    self.category_map[category_str] = new_category
+                    for task_item in data["category_map"][category_str]["tasks"]:
+                        task_name, task_id, description= task_item["name"], task_item["id"], task_item["description"]
+                        new_task = Task(name=task_name, description=description, category=new_category, id_input=task_id)
+                        new_task.time_used = task_item["time_used"]
+                        new_task.active = task_item["active"]
+                        new_category.tasks.append(new_task)
+                        print(new_task.name, new_task.description, new_task.time_used, new_task.active)
+                        self.task_map[f"ID {new_task.id}: {new_task.name}"] = new_task
+        except (FileNotFoundError, KeyError, json.decoder.JSONDecodeError):
+            pass
 
         for task_str, item in self.task_map.items():
             self.task_scrollbar.insert(END, task_str)
+
+    def load_day_data(self):
+        try:
+            with open("days.json", "r") as file:
+                self.day_data = json.load(file)
+        except (FileNotFoundError, KeyError, json.decoder.JSONDecodeError):
+            pass
+
+        if self.current_date not in self.day_data:
+            self.day_data[self.current_date] = {}
 
 
 app = TaskManager()
