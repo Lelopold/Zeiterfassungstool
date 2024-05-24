@@ -1,6 +1,3 @@
-from task import Task
-
-
 class Category:
     def __init__(self, name, cat_id):
         self.name = name
